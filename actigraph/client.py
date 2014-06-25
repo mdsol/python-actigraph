@@ -49,7 +49,6 @@ class ActigraphClient(object):
 
         return url, headers
 
-
     def make_authentication_headers(self, signed_string, dt):
         """Makes headers for Authorization and date, including the access key and the string signed with
            the secret key
@@ -83,7 +82,6 @@ class ActigraphClient(object):
             Returns the encoded string
 
         """
-
         #API only has GET requests so there is no body to md5 hash, verb is always GET and content type is always ''
         vals = dict(body_md5 = '',
                     verb='GET',
@@ -99,20 +97,20 @@ class ActigraphClient(object):
         """Make a get request"""
         url, headers = self._make(api_url)
         #Verify = False because actigraph SSL cert signed by authority that is not in requests root cert store
+        #TODO: Check that Verify still required
         return requests.get(url, headers=headers, verify=False)
 
     def _check_start_end(self, start, end):
         """Check start < end or raise ValueError"""
-        if start > end:
+        if not start < end:
             raise ValueError("Start time after End Time")
 
     def _check_twenty_four_hours(self, start, end):
-        """Check start < end or raise ValueError"""
+        """If difference between start and end > 24Hours raise ValueError"""
         # Cannot be greater than 24 hour gap
         diff = end - start
         if diff.total_seconds() > SECONDS_IN_24_HOURS:
             raise ValueError("Date span is greater than 24 hours")
-
 
     #- API Methods -----------------------------------------------------------------------------------------------------
 
@@ -171,7 +169,6 @@ class ActigraphClient(object):
         url = "/v1/subjects/{0!s}/daystats".format(subject_id)
         return self.get(url)
 
-
     def getSubjectDailyMinutes(self, subject_id, date):
         """
         Get daily minutes for subject
@@ -207,7 +204,6 @@ class ActigraphClient(object):
         url = "/v1/subjects/{0!s}/sleepscore?inbed={1}&outbed={2}".format(subject_id, isodatetime(inbed), isodatetime(outbed))
         return self.get(url)
 
-
     def _mergeStartStopParams(self, url, start, stop):
         """Merge optional Start and Stop params into a URL string"""
         params = {}
@@ -236,7 +232,6 @@ class ActigraphClient(object):
 
         return self.get(url)
 
-
     def getSubjectBedTimes(self, subject_id, start=None, stop=None):
         """
         Get Subject in and out of bed times
@@ -251,5 +246,3 @@ class ActigraphClient(object):
         url = self._mergeStartStopParams(url, start, stop)
 
         return self.get(url)
-
-
