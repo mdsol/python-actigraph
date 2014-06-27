@@ -2,10 +2,11 @@ __author__ = 'isparks'
 
 import unittest
 import datetime
+import requests
 import mock
 
 
-from actigraph.client import ActigraphClient, isodate, isodatetime
+from actigraph.client import ActigraphAuth, ActigraphClient, isodate, isodatetime
 
 
 EXAMPLE_ACCESS_KEY = 'testaccesskey'
@@ -18,10 +19,28 @@ class TestUtils(unittest.TestCase):
         dt = datetime.datetime(2014, 1, 9)
         self.assertEqual('2014-01-09', isodate(dt))
 
-class TestClient(unittest.TestCase):
-    """Test client functions"""
+
+class TestRawAuthorizer(unittest.TestCase):
+    """Test of making a call just with the authorizer and raw requests"""
+
+    def test_raw_auth(self):
+        auth = ActigraphAuth('http://example.com', EXAMPLE_SECRET_KEY, EXAMPLE_ACCESS_KEY)
+
+        #Mock request
+        class MockRequest(object):
+            def __init__(self, url):
+                self.headers = {}
+                self.url = url
+
+        result = auth(MockRequest('http://example.com/v1/studies'))
+
+        self.assertTrue(True, 'Authorization' in result.headers)
+        self.assertTrue(True, 'Date' in result.headers)
+
+class TestAuthClient(unittest.TestCase):
+    """Test auth client functions"""
     def setUp(self):
-        self.ac = ActigraphClient('http://example.com',EXAMPLE_ACCESS_KEY,EXAMPLE_SECRET_KEY)
+        self.ac = ActigraphAuth('http://example.com',EXAMPLE_ACCESS_KEY,EXAMPLE_SECRET_KEY)
 
     def test_make_signature_string(self):
         """Test formatting of signature string"""
@@ -55,7 +74,7 @@ class TestClient(unittest.TestCase):
         def test_date(mock_dt):
             mock_dt.utcnow.return_value = fixed_time
 
-            url, headers = self.ac._make("/v1/studies")
+            headers = self.ac.make_headers(self.ac.make_url("/v1/studies"))
 
             self.assertEqual('AGS testaccesskey:HiPTGTljix5BP+cTLwCGLA23pYL2E1jFDLzrVjuxUJE=',headers['Authorization'])
 
@@ -80,7 +99,7 @@ class TestClientValidations(ACMockTests):
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
 
         def do():
-            self.ac.getSubjectSleepScore(999, inbed, inbed + datetime.timedelta(hours=24, seconds=1) )
+            self.ac.get_subject_sleep_score(999, inbed, inbed + datetime.timedelta(hours=24, seconds=1) )
 
         self.assertRaises(ValueError, do)
 
@@ -88,7 +107,7 @@ class TestClientValidations(ACMockTests):
         """Start must be before end"""
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
         def do():
-            self.ac.getSubjectSleepScore(999, inbed, inbed + datetime.timedelta(seconds=-1) )
+            self.ac.get_subject_sleep_score(999, inbed, inbed + datetime.timedelta(seconds=-1) )
         self.assertRaises(ValueError, do)
 
     def test_sleep_epochs_gt_24_hours(self):
@@ -97,7 +116,7 @@ class TestClientValidations(ACMockTests):
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
 
         def do():
-            self.ac.getSubjectSleepEpochs(999, inbed, inbed + datetime.timedelta(hours=24, seconds=1) )
+            self.ac.get_subject_sleep_epochs(999, inbed, inbed + datetime.timedelta(hours=24, seconds=1) )
 
         self.assertRaises(ValueError, do)
 
@@ -105,101 +124,101 @@ class TestClientValidations(ACMockTests):
         """Start must be before end"""
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
         def do():
-            self.ac.getSubjectSleepEpochs(999, inbed, inbed + datetime.timedelta(seconds=-1) )
+            self.ac.get_subject_sleep_epochs(999, inbed, inbed + datetime.timedelta(seconds=-1) )
         self.assertRaises(ValueError, do)
 
     def test_subject_bouts_start_after_end(self):
         """Start must be before end"""
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
         def do():
-            self.ac.getSubjectBoutPeriods(999, inbed, inbed + datetime.timedelta(seconds=-1) )
+            self.ac.get_subject_bout_periods(999, inbed, inbed + datetime.timedelta(seconds=-1) )
         self.assertRaises(ValueError, do)
 
 class TestClientURLs(ACMockTests):
     """Gratuituous tests of URL building to get test coverage"""
 
-    def test_getAllStudies(self):
+    def test_get_all_studies(self):
         self.ac.get = mock.MagicMock('get')
-        self.ac.getAllStudies()
+        self.ac.get_all_studies()
         self.ac.get.assert_called_once_with('/v1/studies')
 
-    def test_getStudy(self):
+    def test_get_study(self):
         self.ac.get = mock.MagicMock('get')
-        self.ac.getStudy(123)
+        self.ac.get_study(123)
         self.ac.get.assert_called_once_with('/v1/studies/123')
 
-    def test_getAllSubjects(self):
+    def test_get_all_subjects(self):
         self.ac.get = mock.MagicMock('get')
-        self.ac.getAllSubjects(9)
+        self.ac.get_all_subjects(9)
         self.ac.get.assert_called_once_with('/v1/studies/9/subjects')
 
-    def test_getSubject(self):
+    def test_get_subject(self):
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubject(123)
+        self.ac.get_subject(123)
         self.ac.get.assert_called_once_with('/v1/subjects/123')
 
-    def test_getSubjectStats(self):
+    def test_get_subject_stats(self):
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectStats(123)
+        self.ac.get_subject_stats(123)
         self.ac.get.assert_called_once_with('/v1/subjects/123/stats')
 
-    def test_getSubjectDailyStats(self):
+    def test_get_subject_daily_stats(self):
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectDailyStats(123)
+        self.ac.get_subject_daily_stats(123)
         self.ac.get.assert_called_once_with('/v1/subjects/123/daystats')
 
     def test_getSubjectDailyMinutes(self):
         self.ac.get = mock.MagicMock('get')
         dt = datetime.datetime(2014, 6, 11)
-        self.ac.getSubjectDailyMinutes(123, dt)
+        self.ac.get_subject_daily_minutes(123, dt)
         self.ac.get.assert_called_once_with('/v1/subjects/123/dayminutes/%s' % isodate(dt))
 
     def test_subject_bouts_simple(self):
         """Check format of url with no parameters passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectBoutPeriods(999)
+        self.ac.get_subject_bout_periods(999)
         self.ac.get.assert_called_once_with('/v1/subjects/999/bouts')
 
     def test_subject_bouts_start_only(self):
         """Check format of url with start parameter passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectBoutPeriods(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0))
+        self.ac.get_subject_bout_periods(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0))
         self.ac.get.assert_called_once_with('/v1/subjects/999/bouts?start=2014-05-29T20:00:00')
 
     def test_subject_bouts_stop_only(self):
         """Check format of url with end parameter passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectBoutPeriods(999,stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
+        self.ac.get_subject_bout_periods(999,stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
         self.ac.get.assert_called_once_with('/v1/subjects/999/bouts?stop=2014-05-30T20:00:00')
 
     def test_subject_bouts_both(self):
         """Check format of url with start and end parameter passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectBoutPeriods(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0),stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
+        self.ac.get_subject_bout_periods(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0),stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
         self.ac.get.assert_called_once_with('/v1/subjects/999/bouts?start=2014-05-29T20:00:00&stop=2014-05-30T20:00:00')
 
     def test_subject_bed_times_simple(self):
         """Check format of url with no parameters passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectBedTimes(999)
+        self.ac.get_subject_bed_times(999)
         self.ac.get.assert_called_once_with('/v1/subjects/999/bedtimes')
 
     def test_subject_bed_times_start_only(self):
         """Check format of url with start parameter passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectBedTimes(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0))
+        self.ac.get_subject_bed_times(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0))
         self.ac.get.assert_called_once_with('/v1/subjects/999/bedtimes?start=2014-05-29T20:00:00')
 
     def test_subject_bed_times_stop_only(self):
         """Check format of url with end parameter passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectBedTimes(999,stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
+        self.ac.get_subject_bed_times(999,stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
         self.ac.get.assert_called_once_with('/v1/subjects/999/bedtimes?stop=2014-05-30T20:00:00')
 
     def test_subject_bed_times_both(self):
         """Check format of url with start and end parameter passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.getSubjectBedTimes(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0),stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
+        self.ac.get_subject_bed_times(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0),stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
         self.ac.get.assert_called_once_with('/v1/subjects/999/bedtimes?start=2014-05-29T20:00:00&stop=2014-05-30T20:00:00')
 
     def test_subject_sleep_score(self):
@@ -207,7 +226,7 @@ class TestClientURLs(ACMockTests):
         self.ac.get = mock.MagicMock('get')
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
         outbed = datetime.datetime(2014, 5, 30, 20, 0, 0)
-        self.ac.getSubjectSleepScore(999,inbed, outbed)
+        self.ac.get_subject_sleep_score(999,inbed, outbed)
         self.ac.get.assert_called_once_with('/v1/subjects/999/sleepscore?inbed=%s&outbed=%s' % (isodatetime(inbed), isodatetime(outbed)))
 
     def test_subject_sleep_epochs(self):
@@ -215,16 +234,16 @@ class TestClientURLs(ACMockTests):
         self.ac.get = mock.MagicMock('get')
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
         outbed = datetime.datetime(2014, 5, 30, 20, 0, 0)
-        self.ac.getSubjectSleepEpochs(999,inbed, outbed)
+        self.ac.get_subject_sleep_epochs(999,inbed, outbed)
         self.ac.get.assert_called_once_with('/v1/subjects/999/sleepepochs?inbed=%s&outbed=%s' % (isodatetime(inbed), isodatetime(outbed)))
+
 
 class TestPatchRequests(ACMockTests):
     """Gratuituous test patching requests.get to get to 100% coverage"""
 
-
     def test_getAllStudies(self):
         with mock.patch('actigraph.client.requests.get') as mocked:
-            self.ac.getAllStudies()
+            self.ac.get_all_studies()
             # Mocked call url we made is the first mocked call, second parameter, first element
             self.assertEqual('http://example.com/v1/studies',mocked.mock_calls[0][1][0])
 
