@@ -1,11 +1,9 @@
-Actigraph client
-================
+# Actigraph client
 
-An Actigraph Authorizer for the [request](http://docs.python-requests.org/en/latest/ "Request") python HTTP library
+An Actigraph Authorizer for the [requests](http://docs.python-requests.org/en/latest/ "Requests") python HTTP library
 including a client that wraps the calls for the [Actigraph](http://www.actigraphcorp.com/ "Actigraph") Study and Subject API.
 
-Usage
-=====
+## Usage
 
 You will need a secret and access keypair provided by Actigraph.
 
@@ -39,10 +37,7 @@ The Actigraph system returns results as JSON so the .json() method of the result
 interesting.
 
 
-Installation / Requirements
-===========================
-
-actigraph relies on the requests library.
+## Installation 
 
 Suggested:
 
@@ -56,3 +51,8 @@ or
 ```bash
 $ pip install git+git://github.com/mdsol/python-actigraph#egg=actigraph
 ```
+
+## Dependencies
+
+* requests
+
