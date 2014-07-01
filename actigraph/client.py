@@ -18,22 +18,33 @@ def isodate(dt):
     """Takes a date, returns ISO8601 date format"""
     return dt.strftime('%Y-%m-%d')
 
-class ActigraphClient(object):
-    """A simple Actigraph client."""
+class ActigraphAuth(requests.auth.AuthBase):
+    """Custom requests authorizer for Actigraph"""
     def __init__(self, base_url, access_key, secret_key):
         self.base_url = base_url
         self.access_key = access_key
         self.secret_key = secret_key
 
+    def __call__(self, r):
+        """Call is made like:
+           requests.get(url, auth=MyAuth())
+        """
+        r.headers.update(self.make_headers(r.url))
+        return r
+
     def sign(self, signature_string):
         """Return the signed value of the signature string"""
         return base64.b64encode(hmac.new(self.secret_key, signature_string, hashlib.sha256).digest())
 
-    def _make(self, resource_url):
-        """Make URL and headers for the request."""
-
-        #Make the full URL
+    def make_url(self, resource_url):
+        """
+        Return full URL
+        """
         url = u"%s%s" % (self.base_url, resource_url,)
+        return url
+
+    def make_headers(self, url):
+        """Make headers for the request."""
 
         #Get the time of the request
         date_time = datetime.datetime.utcnow()
@@ -47,7 +58,7 @@ class ActigraphClient(object):
         #Set the headers
         headers = self.make_authentication_headers(signed, date_time)
 
-        return url, headers
+        return headers
 
     def make_authentication_headers(self, signed_string, dt):
         """Makes headers for Authorization and date, including the access key and the string signed with
@@ -93,12 +104,18 @@ class ActigraphClient(object):
         string_to_sign = '{verb}\n{body_md5}\n{content_type}\n{date}Z\n{url_path}'.format(**vals)
         return string_to_sign
 
+
+class ActigraphClient(object):
+    """A simple client that wraps the requests and authorization"""
+    def __init__(self, base_url, access_key, secret_key):
+        self.auth = ActigraphAuth(base_url, access_key, secret_key)
+
     def get(self, api_url):
         """Make a get request"""
-        url, headers = self._make(api_url)
+        url = self.auth.make_url(api_url)
         #Verify = False because actigraph SSL cert signed by authority that is not in requests root cert store
         #TODO: Check that Verify still required
-        return requests.get(url, headers=headers, verify=False)
+        return requests.get(url, auth=self.auth, verify=False)
 
     def _check_start_end(self, start, end):
         """Check start < end or raise ValueError"""
@@ -114,7 +131,7 @@ class ActigraphClient(object):
 
     #- API Methods -----------------------------------------------------------------------------------------------------
 
-    def getAllStudies(self):
+    def get_all_studies(self):
         """
         Get all studies that these credentials can access
 
@@ -123,7 +140,7 @@ class ActigraphClient(object):
         url = "/v1/studies"
         return self.get(url)
 
-    def getStudy(self, study_id):
+    def get_study(self, study_id):
         """
         Get details of a particular study
 
@@ -132,7 +149,7 @@ class ActigraphClient(object):
         url = "/v1/studies/{0!s}".format(study_id)
         return self.get(url)
 
-    def getAllSubjects(self, study_id):
+    def get_all_subjects(self, study_id):
         """
         Get all subjects for a study
 
@@ -141,7 +158,7 @@ class ActigraphClient(object):
         url = "/v1/studies/{0!s}/subjects".format(study_id)
         return self.get(url)
 
-    def getSubject(self, subject_id):
+    def get_subject(self, subject_id):
         """
         Get Subject Details
 
@@ -151,7 +168,7 @@ class ActigraphClient(object):
         return self.get(url)
 
 
-    def getSubjectStats(self, subject_id):
+    def get_subject_stats(self, subject_id):
         """
         Get Subject Statistics
 
@@ -160,7 +177,7 @@ class ActigraphClient(object):
         url = "/v1/subjects/{0!s}/stats".format(subject_id)
         return self.get(url)
 
-    def getSubjectDailyStats(self, subject_id):
+    def get_subject_daily_stats(self, subject_id):
         """
         Get Daily stats for a subject
 
@@ -169,7 +186,7 @@ class ActigraphClient(object):
         url = "/v1/subjects/{0!s}/daystats".format(subject_id)
         return self.get(url)
 
-    def getSubjectDailyMinutes(self, subject_id, date):
+    def get_subject_daily_minutes(self, subject_id, date):
         """
         Get daily minutes for subject
 
@@ -178,7 +195,7 @@ class ActigraphClient(object):
         url = "/v1/subjects/{0!s}/dayminutes/{1}".format(subject_id, isodate(date))
         return self.get(url)
 
-    def getSubjectSleepEpochs(self, subject_id, inbed, outbed):
+    def get_subject_sleep_epochs(self, subject_id, inbed, outbed):
         """
         Get Sleep Epochs for a subject
         https://github.com/actigraph/StudyAdminAPIDocumentation/blob/master/sections/subjects.md#get-sleep-epochs-for-a-subject-v11
@@ -190,7 +207,7 @@ class ActigraphClient(object):
         url = "/v1/subjects/{0!s}/sleepepochs?inbed={1}&outbed={2}".format(subject_id, isodatetime(inbed), isodatetime(outbed))
         return self.get(url)
 
-    def getSubjectSleepScore(self, subject_id, inbed, outbed):
+    def get_subject_sleep_score(self, subject_id, inbed, outbed):
         """
         Get Sleep Score for a subject
 
@@ -217,7 +234,7 @@ class ActigraphClient(object):
             url = "{0}?{1}".format(url,urllib.urlencode(params)).replace('%3A',':')
         return url
 
-    def getSubjectBoutPeriods(self, subject_id, start=None, stop=None):
+    def get_subject_bout_periods(self, subject_id, start=None, stop=None):
         """
         Get Subject Bout periods (when they are wearing and not wearing device)
 
@@ -232,7 +249,7 @@ class ActigraphClient(object):
 
         return self.get(url)
 
-    def getSubjectBedTimes(self, subject_id, start=None, stop=None):
+    def get_subject_bed_times(self, subject_id, start=None, stop=None):
         """
         Get Subject in and out of bed times
 
