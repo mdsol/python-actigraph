@@ -14,8 +14,9 @@ setup(
     long_description=open('README.md').read(),
     zip_safe=False,
     include_package_data=True,
+    test_suite='tests',
     package_data = { '': ['README.md'] },
-    install_requires=['requests'],
+    install_requires=['requests', 'six'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
