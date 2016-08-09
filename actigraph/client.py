@@ -6,7 +6,7 @@ import datetime
 import hmac
 import hashlib
 import base64
-import urllib
+from six.moves.urllib.parse import urlencode
 
 SECONDS_IN_24_HOURS = 24 * 60 * 60
 
@@ -22,8 +22,8 @@ class ActigraphAuth(requests.auth.AuthBase):
     """Custom requests authorizer for Actigraph"""
     def __init__(self, base_url, access_key, secret_key):
         self.base_url = base_url
-        self.access_key = access_key
-        self.secret_key = secret_key
+        self.access_key = access_key.encode('utf-8')
+        self.secret_key = secret_key.encode('utf-8')
 
     def __call__(self, r):
         """Call is made like:
@@ -34,7 +34,9 @@ class ActigraphAuth(requests.auth.AuthBase):
 
     def sign(self, signature_string):
         """Return the signed value of the signature string"""
-        return base64.b64encode(hmac.new(self.secret_key, signature_string, hashlib.sha256).digest())
+        return base64.b64encode(hmac.new(self.secret_key,
+                                         signature_string.encode('utf-8'),
+                                         hashlib.sha256).digest())
 
     def make_url(self, resource_url):
         """
@@ -69,7 +71,8 @@ class ActigraphAuth(requests.auth.AuthBase):
 
         """
         return {
-                'Authorization' : 'AGS %s:%s' % (self.access_key,signed_string,),
+                'Authorization' : u"AGS {}:{}".format(self.access_key.decode('utf-8'),
+                                                      signed_string.decode('utf-8')),
                 'Date' : dt.strftime('%a, %d %b %Y %H:%M:%S +0000')
                 }
 
@@ -231,7 +234,7 @@ class ActigraphClient(object):
 
         if params:
             #Actigraph API does not like urlencoded : characters
-            url = "{0}?{1}".format(url,urllib.urlencode(params)).replace('%3A',':')
+            url = "{0}?{1}".format(url, urlencode(params)).replace('%3A',':')
         return url
 
     def get_subject_bout_periods(self, subject_id, start=None, stop=None):

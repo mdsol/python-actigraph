@@ -4,14 +4,23 @@ import unittest
 import datetime
 import requests
 import mock
-
+from six.moves.urllib.parse import urlparse, parse_qs
 
 from actigraph.client import ActigraphAuth, ActigraphClient, isodate, isodatetime
 
 
-EXAMPLE_ACCESS_KEY = 'testaccesskey'
-EXAMPLE_SECRET_KEY = 'testsecretkey'
+EXAMPLE_ACCESS_KEY = u'testaccesskey'
+EXAMPLE_SECRET_KEY = u'testsecretkey'
 
+
+def assert_urls_equal(a, b):
+    # Asserts two URLS match, working around the vagueries of query string ordering
+    _a = urlparse(a)
+    _b = urlparse(b)
+    if _a.path == _b.path:
+        if parse_qs(_a.query) == parse_qs(_b.query):
+            return True
+    return False
 
 class TestUtils(unittest.TestCase):
     """Test utility functions"""
@@ -52,16 +61,16 @@ class TestAuthClient(unittest.TestCase):
         """Test signature against example from Actigraph website"""
         #https://github.com/actigraph/StudyAdminAPIDocumentation/blob/master/sections/authentication.md#example-1
         tested = self.ac.sign("GET\n\n\n2014-06-19T15:14:31Z\nhttps://studyadmin-api.actigraphcorp.com/v1/studies")
-        self.assertEqual("J+9FTQTAkfGmUsaRmB/HBMJOXG+4Xqbo3drXBVQwZ4o=", tested)
+        self.assertEqual("J+9FTQTAkfGmUsaRmB/HBMJOXG+4Xqbo3drXBVQwZ4o=", tested.decode('utf-8'))
 
     def test_make_headers(self):
         """Test formatting of headersg"""
         dt = datetime.datetime.strptime('2007-03-27T19:36:42','%Y-%m-%dT%H:%M:%S')
 
-        headers = self.ac.make_authentication_headers('TEST_SIGNED_STRING', dt)
+        headers = self.ac.make_authentication_headers('TEST_SIGNED_STRING'.encode('utf-8'), dt)
 
         self.assertEqual('Tue, 27 Mar 2007 19:36:42 +0000',headers['Date'])
-        self.assertEqual('AGS %s:TEST_SIGNED_STRING' % self.ac.access_key, headers['Authorization'])
+        self.assertEqual(u'AGS %s:TEST_SIGNED_STRING' % self.ac.access_key.decode('utf-8'), headers['Authorization'])
 
 
     def test_make(self):
@@ -76,7 +85,8 @@ class TestAuthClient(unittest.TestCase):
 
             headers = self.ac.make_headers(self.ac.make_url("/v1/studies"))
 
-            self.assertEqual('AGS testaccesskey:HiPTGTljix5BP+cTLwCGLA23pYL2E1jFDLzrVjuxUJE=',headers['Authorization'])
+            self.assertEqual(u'AGS testaccesskey:HiPTGTljix5BP+cTLwCGLA23pYL2E1jFDLzrVjuxUJE=',
+                             headers['Authorization'])
 
         #Run it
         test_date()
@@ -195,7 +205,10 @@ class TestClientURLs(ACMockTests):
         """Check format of url with start and end parameter passed"""
         self.ac.get = mock.MagicMock('get')
         self.ac.get_subject_bout_periods(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0),stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
-        self.ac.get.assert_called_once_with('/v1/subjects/999/bouts?start=2014-05-29T20:00:00&stop=2014-05-30T20:00:00')
+        # this is slightly more difficult given how the ordering of the params can change
+        self.assertEqual(1, self.ac.get.call_count)
+        self.assertTrue(assert_urls_equal('/v1/subjects/999/bouts?start=2014-05-29T20:00:00&stop=2014-05-30T20:00:00',
+                                          self.ac.get.call_args[0][0]))
 
     def test_subject_bed_times_simple(self):
         """Check format of url with no parameters passed"""
@@ -218,8 +231,14 @@ class TestClientURLs(ACMockTests):
     def test_subject_bed_times_both(self):
         """Check format of url with start and end parameter passed"""
         self.ac.get = mock.MagicMock('get')
-        self.ac.get_subject_bed_times(999,start=datetime.datetime(2014, 5, 29, 20, 0, 0),stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
-        self.ac.get.assert_called_once_with('/v1/subjects/999/bedtimes?start=2014-05-29T20:00:00&stop=2014-05-30T20:00:00')
+        self.ac.get_subject_bed_times(999,
+                                      start=datetime.datetime(2014, 5, 29, 20, 0, 0),
+                                      stop=datetime.datetime(2014, 5, 30, 20, 0, 0))
+        # this is slightly more difficult given how the ordering of the params can change
+        self.assertEqual(1, self.ac.get.call_count)
+        self.assertTrue(
+            assert_urls_equal('/v1/subjects/999/bedtimes?start=2014-05-29T20:00:00&stop=2014-05-30T20:00:00',
+                              self.ac.get.call_args[0][0]))
 
     def test_subject_sleep_score(self):
         """Check format of url"""
@@ -227,7 +246,12 @@ class TestClientURLs(ACMockTests):
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
         outbed = datetime.datetime(2014, 5, 30, 20, 0, 0)
         self.ac.get_subject_sleep_score(999,inbed, outbed)
-        self.ac.get.assert_called_once_with('/v1/subjects/999/sleepscore?inbed=%s&outbed=%s' % (isodatetime(inbed), isodatetime(outbed)))
+        # this is slightly more difficult given how the ordering of the params can change
+        self.assertEqual(1, self.ac.get.call_count)
+        self.assertTrue(
+            assert_urls_equal('/v1/subjects/999/sleepscore?inbed=%s&outbed=%s' % (isodatetime(inbed),
+                                                                                  isodatetime(outbed)),
+                              self.ac.get.call_args[0][0]))
 
     def test_subject_sleep_epochs(self):
         """Check format of url with start and end parameter passed"""
@@ -235,7 +259,12 @@ class TestClientURLs(ACMockTests):
         inbed = datetime.datetime(2014, 5, 29, 20, 0, 0)
         outbed = datetime.datetime(2014, 5, 30, 20, 0, 0)
         self.ac.get_subject_sleep_epochs(999,inbed, outbed)
-        self.ac.get.assert_called_once_with('/v1/subjects/999/sleepepochs?inbed=%s&outbed=%s' % (isodatetime(inbed), isodatetime(outbed)))
+        # this is slightly more difficult given how the ordering of the params can change
+        self.assertEqual(1, self.ac.get.call_count)
+        self.assertTrue(
+            assert_urls_equal('/v1/subjects/999/sleepepochs?inbed=%s&outbed=%s' % (isodatetime(inbed),
+                                                                                   isodatetime(outbed)),
+                              self.ac.get.call_args[0][0]))
 
 
 class TestPatchRequests(ACMockTests):
